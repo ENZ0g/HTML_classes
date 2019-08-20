@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ru">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <title>3_13_solution</title>
+        <link rel="stylesheet"
+              href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+              integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+              crossorigin="anonymous">
+        <style>
+            body {
+                background-color: #374258
+            }
+            p, em {
+                color: #f3f3f3
+            }
+            pre {
+                background-color: #c4c4c4;
+                padding: 10px;
+                border-radius: 3px
+            }
+            a {
+                color: #909090
+            }
+            a:hover {
+                color: #818181;
+                text-decoration: none
+            }
+            span {
+                background-color: #eee
+            }
+            h3 {
+                color: #f3f3f3;
+            }
+            .solution {
+                border-right: 15px solid #6ead3a;
+                border-bottom-right-radius: 15px
+            }
+            .error {
+                border-right: 15px solid #ff4040;
+                border-bottom-right-radius: 15px
+            }
+
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <p>В задании дан фрагмент кода и результат работы этого кода. Вот фрагмент:</p>
+            <code>
+                <pre>
+with HTML(output="test.html") as doc:
+    with TopLevelTag("head") as head:
+        with Tag("title") as title:
+            title.text = "hello"
+            head += title
+        doc += head
+
+    with TopLevelTag("body") as body:
+        with Tag("h1", klass=("main-text",)) as h1:
+            h1.text = "Test"
+            body += h1
+
+        with Tag("div", klass=("container", "container-fluid"), id="lead") as div:
+            with Tag("p") as paragraph:
+                paragraph.text = "another test"
+                div += paragraph
+
+            with Tag("img", is_single=True, src="/icon.png", data_image="responsive") as img:
+                div += img
+
+            body += div
+
+        doc += body
+                </pre>
+            </code>
+            <p>Вот результат:</p>
+            <code>
+                <pre>
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;hello&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;h1 class="main-text"&gt;Test&lt;/h1&gt;
+    &lt;div class="container container-fluid" id="lead"&gt;
+        &lt;p&gt;another test&lt;/p&gt;
+        &lt;img src="/icon.png" data-image="responsive"/&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+                </pre>
+            </code>
+            <p>Для выполнения задачи необходимо определить использованные в коде классы <code>HTML</code>,
+                <code>TopLevelTag</code> и <code>Tag</code> так, чтобы все работало и выдавало результат
+                как на фрагменте выше.</p>
+            <p>Я пойду по кусочкам, от маленького к большому. Начну с класса <code>Tag</code>. Вот этот фрагмент:</p>
+            <code>
+                <pre>
+with Tag("title") as title:
+            title.text = "hello"
+                </pre>
+            </code>
+            <p>Здесь я вижу, что при создании экземпляра класса передается только строковое значение названия тэга.
+            И еще замечаю наличие атрибута <code>.text</code> у экземпляра класса. Таким образом, чтобы
+                реализовать данный функционал, получаю:
+            </p>
+            <em>Код решения буду помечать зелёной полосой справа, чтобы отличать его от кода задания</em>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+                </pre>
+            </code>
+            <p>Дальше вижу, что экземляр класса создается с помощью контекстного оператора <code>with</code>.
+            Значит, нужно прописать методы <code>__enter__</code> и <code>__exit__</code>.</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        print(f'<{self.name}>{self.text}&lt;/{self.name}>')
+                </pre>
+            </code>
+            <p>Я думаю с f-string'ами вы знакомы: в места, ограниченные фигурными скобками будет подставленны значения
+                соответствующих значений атрибутов. Я запущу тест с другими входными данными, чтобы стало понятней
+                что куда передается:
+            </p>
+            <code>
+                <pre class="solution">
+with Tag('h2') as header:
+    header.text = 'Hello world'
+                </pre>
+            </code>
+            <p>Что получим? Ошибку!</p>
+            <code>
+                <pre class="error">
+    header.text = 'Hello world'
+TypeError: __exit__() takes 1 positional argument but 4 were given
+                </pre>
+            </code>
+            <p>На вход <code>__exit__</code> я принял один параметр вместо четырех. Лезу в
+                <a href="https://docs.python.org/3/reference/datamodel.html#object.__exit__">документацию</a>
+            и вижу, что, действительно, меня просят указать <code>self</code>, <code>exc_type</code>,
+                <code>exc_value</code>, <code>traceback</code>. Это обработчики ошибок, которые я сейчас
+                использовать не буду, а чтобы не запоминать и не набирать кучу букв, поступлю хитрее:
+            </p>
+            <code>
+                <pre class="solution">
+def __exit__(self, *args):
+    print(f'<{self.name}>{self.text}&lt;/{self.name}>')
+                </pre>
+            </code>
+            <p>Так как именованных параметров нет, <code>**kwargs</code> можно не указывать, хотя это будет работать
+            и не вызовет никаких ошибок. Итак, запускаю тест и получаю то, что нужно:</p>
+            <code>
+                <pre class="solution">
+&lt;h2&gt;Hello world&lt;/h2&gt;                    
+                </pre>
+            </code>
+            <p>Далее определю класс <code>TopLevelTag</code>. Так как функционал у него такой же, унаследую его от
+             <code>Tag</code>. Проверю, заодно покажу весь код:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        print(f'<{self.name}>{self.text}&lt;/{self.name}>')
+
+
+class TopLevelTag(Tag):
+    pass
+
+
+with Tag('h2') as header:
+    header.text = 'Hello world'
+
+with TopLevelTag('main') as main:
+    main.text = 'Im pythonist'
+                </pre>
+            </code>
+            <p>Все работает:</p>
+            <code>
+                <pre class="solution">
+&lt;h2&gt;Hello world&lt;/h2&gt;
+&lt;main&gt;Im pythonist&lt;/main&gt;                    
+                </pre>
+            </code>
+            <p>Теперь поработаю с вложенностью. Вложение происходит через конструкцию <code>+=</code>, т.е. надо
+            поколдовать с <code>__iadd__</code>. Я решил, что буду складывать все вложенные тэги в список - добавил
+            атрибут <code>children</code>, в <code>__iadd__</code> использовал <code>.append()</code> и в
+                <code>__exit__</code> теперь выводится <code>self.children</code>:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+        <span>self.children = []</span>
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        print(f'<{self.name}>{self.text}<span>{self.children}</span>&lt;/{self.name}>')
+
+    <span>def __iadd__(self, other):</span>
+        <span>self.children.append(other)</span>
+                </pre>
+            </code>
+            <p>Тестирую таким кодом:</p>
+            <code>
+                <pre class="solution">
+with TopLevelTag('main') as main:
+    main.text = 'Im pythonist'
+    with Tag('h2') as header:
+        header.text = 'Hello world'
+        main += header
+                </pre>
+            </code>
+            <p>Получаю</p>
+                        <code>
+                <pre class="solution">
+&lt;h2&gt;Hello world[]&lt;/h2&gt;
+&lt;main&gt;Im pythonist[&lt;__main__.Tag object at 0x00733390&gt;]&lt;/main&gt;
+                </pre>
+            </code>
+            <p>Все бы хорошо, но я получаю ссылку на экземпляр класса <code>Tag</code> вместо самого экземпляра и
+            выводить вложенный тег отдельно мне тоже не нужно. Первую задачу попробую решить через добавление метода
+            <code>__str__</code>:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+        self.children = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        print(f'<{self.name}>{self.text}{<span>str(*self.children)</span>}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+
+    <span>def __str__(self):</span>
+        <span>return f'<{self.name}>{self.text}&lt;/{self.name}>'</span>
+                </pre>
+            </code>
+            <p>Использование <code>*</code> перед <code>self</code> позволяет "раскрыть" список. Эффект такой же, как если бы я
+            прошёлся циклом по нему, но только без цикла. Все работает как надо:</p>
+            <code>
+                <pre class="solution">
+&lt;h2&gt;Hello world&lt;/h2&gt;
+&lt;main&gt;Im pythonist&lt;h2&gt;Hello world&lt;/h2&gt;&lt;/main&gt;                    
+                </pre>
+            </code>
+            <p>Думаю стоит добавить флаг, является ли тэг вложенным. Если он таковым является, то при вызове
+                <code>__exit__</code> выводить ничего не буду. Добавлю атрибут <code>is_child</code> со значением
+                по умолчанию <code>False</code>. В <code>__exit__</code> буду проверять, что тэг не вложен, а при
+                совершении вложения, т.е. <code>+=</code>, буду менять значение атрибута <code>is_child</code>
+                на <code>True</code>. Вот так:</p>
+                <code>
+                    <pre class="solution">
+class Tag:
+    def __init__(self, name):
+        self.name = name
+        self.text = ''
+        self.children = []
+        <span>self.is_child = False</span>
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        <span>if not self.is_child:</span>
+            print(f'<{self.name}>{self.text}{str(*self.children)}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        <span>other.is_child = True</span>
+
+    def __str__(self):
+        return f'<{self.name}>{self.text}&lt;/{self.name}>'
+                    </pre>
+                </code>
+            <p>Вот, что мы теперь получаем:</p>
+            <code>
+                <pre class="solution">
+&lt;main&gt;Im pythonist&lt;h2&gt;Hello world&lt;/h2&gt;&lt;/main&gt;                    
+                </pre>
+            </code>
+            <p>Все как надо. Форматирование (отступы и переносы) добавлю в самом конце. Теперь разберу такую
+            строчку:</p>
+            <code>
+                <pre>
+with Tag("div", klass=("container", "container-fluid"), id="lead") as div:
+                </pre>
+            </code>
+            <p>В ней создается тэг с параметрами <code>klass</code> и <code>id</code>. Значит добавим их в класс.
+            Атрибутов у тэга может быть несколько и у разных тегов они разные, поэтому определять их все весьма
+            бестолково. Так как атрибуты будут задаваться в формате [АТРИБУТ] = [ЗНАЧЕНИЕ], т.е. параметры будут
+            именованные, пусть все они будут складываться в словарик, надо только добавить <code>**</code>
+            перед ним:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name, <span>**attributes</span>):
+        self.name = name
+        self.text = ''
+        self.children = []
+        self.is_child = False
+        <span>self.attributes = attributes</span>
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self.is_child:
+            print(f'<{self.name}<span>{self.attributes}</span>>{self.text}{str(*self.children)}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        other.is_child = True
+
+    def __str__(self):
+        return f'<{self.name}<span>{self.attributes}</span>>{self.text}&lt;/{self.name}>'
+                </pre>
+            </code>
+            <p>Если вы со скрипом понимаете все эти арги и кварги, то я постараюсь объяснить что это такое.
+            Бывает, когда определяешь функцию, количество аргументов заранее неизвестно. Например, глупо определять
+            функуию, которая считает среднее арифметическое с двумя, тремя или, вообще, с любым конкретным количеством
+            аргументов. Такая функция должна принимать любое количество аргументов. Так вот, если нам неважен
+            порядок аргументов, какой аргумент за что отвечает, как в случае с функцией, вычисляющей среднее
+            арифметическое, то их можно передавать просто списком. В этом случае функция определяется с аргументом
+            <coode>*args</coode>, хотя args можно заменить на что угодно. Здесь важна именно одна звездочка.
+            </p>
+            <p>В случае же, если аргументов много, да они еще и отвечают за конкретные параметры, то передача их
+            в функцию идет более осмысленно, а именно: [ПАРАМЕТР]=[ЗНАЧЕНИЕ]. Например вы определяете машину, у которой
+            количество дверей - 2, мощность - 300л.с., объем багажника - 300л, максимальня скорость - 300км/ч.
+            Как передать эти параметры, чтобы функция поняла, что 300 это именно объем багажника, а не мощность?
+            Соответственно, есть смысл определить их как <code>doors=2</code>, <code>power=300</code>,
+            <code>speed=300</code>, <code>trunk=300</code>. И таких параметров может быть у одной машины 10,
+            у другой 30. Тогда на помощь приходит <code>**kwargs</code>. Я не проверял, но уверен расшифровывается
+                как key word arguments. В теле функции работа с <code>**kwargs</code> превращаеься в работу с обычным
+                словарём. Вот такой код можно накидать, чтобы попробовать эти чудеса:</p>
+            <code>
+                <pre>
+def get_mid(*args):
+    print(sum(args)//len(args))
+
+
+def print_from_dict(**kwargs):
+    for key, value in kwargs.items():
+        print(f'{key}---{value}')
+
+
+get_mid(1, 2, 5, 10)
+print_from_dict(power=300, speed=300, trunk=300, doors=2)
+                </pre>
+            </code>
+            <p>Выведет:</p>
+            <code>
+                <pre>
+4
+power---300
+speed---300
+trunk---300
+doors---2
+                </pre>
+            </code>
+            <p>Надеюсь, стало понятней. Вернемся к нашим классам. Выше я внес изменения в класс <code>Tag</code>,
+             посмотрим что из этого получилось! Для этого поправлю еще тест-код:</p>
+            <code>
+                <pre class="solution">
+with TopLevelTag('main') as main:
+    main.text = 'Im pythonist'
+    with Tag('h2', <span>klass='article-header'</span>) as header:
+        header.text = 'Hello world'
+        main += header
+                </pre>
+            </code>
+            <p>Выведет:</p>
+            <code>
+                <pre class="solution">
+&lt;main&gt;Im pythonist&lt;h2{'klass': 'article-header'}&gt;Hello world&lt;/h2&gt;&lt;/main&gt;                    
+                </pre>
+            </code>
+            <p>Кривовато. Надо работать с форматированием. Надо заменить <code>klass</code> на
+                <code>class</code>. Займусь этим позже, сначала добью функционал.</p>
+            <p>Попробую взять кусочек кода из задания и протестировать свои классы на нём. Беру это:</p>
+            <code>
+                <pre>
+with TopLevelTag("body") as body:
+    with Tag("h1", klass=("main-text",)) as h1:
+        h1.text = "Test"
+        body += h1
+
+    with Tag("div", klass=("container", "container-fluid"), id="lead") as div:
+        with Tag("p") as paragraph:
+            paragraph.text = "another test"
+            div += paragraph
+
+        with Tag("img", is_single=True, src="/icon.png" data_image="responsive") as img:
+            div += img
+
+        body += div
+                </pre>
+            </code>
+            <p>Получаю это:</p>
+            <code>
+                <pre class="error">
+    div += img
+TypeError: unsupported operand type(s) for +=: 'NoneType' and 'Tag'
+                </pre>
+            </code>
+            <p>Ошибочка. Из описания видно, что меня ругают за попытку сложить нескладываемое. Якобы одно слагаемое
+            относится к классу <code>Tag</code>, а другое неопределено. Просверлив взглядом до дыр метод
+            <code>__iadd__</code> и пораскинув мозгами, прихожу к выводу, что сложение я произвожу, но ничего не
+                возвращаю из метода, отсюда и <code>NoneType</code>. Исправляю.</p>
+            <code>
+                <pre class="solution">
+def __iadd__(self, other):
+    self.children.append(other)
+    other.is_child = True
+    <span>return self</span>
+                </pre>
+            </code>
+            <p>Получаю:</p>
+            <code>
+                <pre class="error">
+    print(f'<{self.name}{self.attributes}>{self.text}{str(*self.children)}&lt;/{self.name}>')
+TypeError: str() argument 2 must be str, not Tag
+                </pre>
+            </code>
+            <p>Получается, что при наличии двух и более вложенных тэгов в метод <code>str</code> я передаю
+            неподходящие параметры. Но мне не нужно ничего передавать, мне нужно вывести содержимое списка. Я
+            решл воспользоваться циклом:</p>
+            <code>
+                <pre class="solution">
+def __exit__(self, *args):
+    if not self.is_child:
+        for i in self.children:
+            print(f'<{self.name}{self.attributes}>{self.text}{i}&lt;/{self.name}>')
+                </pre>
+            </code>
+            <p>Получаю:</p>
+            <code>
+                <pre class="solution">
+&lt;head{}&gt;&lt;title{}&gt;hello&lt;/title&gt;&lt;/head&gt;
+&lt;body{}&gt;&lt;h1{'klass': ('main-text',)}&gt;Test&lt;/h1&gt;&lt;/body&gt;
+&lt;body{}&gt;&lt;div{'klass': ('container', 'container-fluid'), 'id': 'lead'}&gt;&lt;/div&gt;&lt;/body&gt;                    
+                </pre>
+            </code>
+            <p>Заработало. Но! Некорректно отрабатывается вложенность. Два раза body, а параграфа и картинки в div-е
+            нет совем.</p>
+            <p>То, что два раза body это понятно: у меня два вложения в <code>self.children</code>.
+                Соответственно, цикл выполняется два раза. Сделаю так:</p>
+            <code>
+                <pre class="solution">
+def __exit__(self, *args):
+    if not self.is_child:
+        child_str = ''
+        for i in self.children:
+            child_str += str(i)
+        print(f'<{self.name}{self.attributes}>{child_str}&lt;/{self.name}>')
+                </pre>
+            </code>
+            <p>Т.е. я сначала собрал строку (<code>child_str</code>) из всех дочерних тэгов и потом сделал один вывод. 
+            Получаю:</p>
+            <code>
+                <pre class="solution">
+&lt;head{}&gt;&lt;title{}&gt;hello&lt;/title&gt;&lt;/head&gt;
+&lt;body{}&gt;&lt;h1{'klass': ('main-text',)}&gt;Test&lt;/h1&gt;&lt;div{'klass': ('container', 'container-fluid'), 'id': 'lead'}&gt;&lt;/div&gt;&lt;/body&gt;                    
+                </pre>
+            </code>
+            <p>Отлично! Только меня напрягает этот ребус. Оставлю за рамками повествования как я делал "улучшайзер"
+                атрибутов <code>pretty_attr</code>. Это не сложно. Вот, что получилось:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name, **attributes):
+        self.name = name
+        self.text = ''
+        self.children = []
+        self.is_child = False
+        self.attributes = attributes
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self.is_child:
+            child_str = ''
+            for i in self.children:
+                child_str += str(i)
+            print(f'<{self.name}{<span>self.pretty_attr()</span>}>{child_str}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        other.is_child = True
+        return self
+
+    def __str__(self):
+        return f'<{self.name}{<span>self.pretty_attr()</span>}>{self.text}&lt;/{self.name}>'
+
+    <span>def pretty_attr(self):</span>
+        <span>if self.attributes:</span>
+            <span>attr_str = ' '</span>
+            <span>for attr, value in self.attributes.items():</span>
+                <span>if attr =='klass':</span>
+                    <span>attr = 'class'</span>
+                    <span>temp_value = ''</span>
+                    <span>for i in value:</span>
+                        <span>temp_value += i + ' '</span>
+                    <span>value = temp_value[0:-1]</span>
+                <span>attr_str += f'{attr}="{value}" '</span>
+            <span>return attr_str[0:-1]</span>
+        <span>else:</span>
+            <span>return ''</span>
+                </pre>
+            </code>
+            <p>Поясню немного. Внутри <code>pretty_attr</code> я проверяю, что у экземпляра класса есть атрибуты
+            и, если это так, пробегаюсь по словарю с атрибутами и превращаю все это в строку <code>attr_str</code>
+            попутно меняя <code>klass</code> на <code>class</code>. Если атрибутов нет, возвращаю пустую строку.
+            Нужно обратить внимание еще на то, как вызывается метод - <code>self.pretty_attr()</code>.
+            Для меня это было не очевидно. Срез <code>[0:-1]</code> убирает последний лишний пробел.</p>
+            <p>Вот, что имеем на выходе:</p>
+            <code>
+                <pre class="solution">
+&lt;head&gt;&lt;title&gt;hello&lt;/title&gt;&lt;/head&gt;                    
+&lt;body&gt;&lt;h1 class="main-text"&gt;Test&lt;/h1&gt;&lt;div class="container container-fluid" id="lead"&gt;&lt;/div&gt;&lt;/body&gt;
+                </pre>
+            </code>
+            <p>Получается красиво! Теперь найду параграф и картинку. Они же должны быть в div-е! Признаюсь, тупил
+            я долго. А ларчик просто открывался! Оказывается, мой метод <code>__str__</code> ничего не знает о вложенных
+                элементах!
+            Поправил:</p>
+            <code>
+                <pre class="solution">
+def __str__(self):
+    if self.children:
+        child_str = ''
+        for i in self.children:
+            child_str += str(i)
+        return f'<{self.name}{self.pretty_attr()}>{self.text}{child_str}&lt;/{self.name}>'
+    else:
+        return f'<{self.name}{self.pretty_attr()}>{self.text}&lt;/{self.name}>'
+                </pre>
+            </code>
+            <p>И вуаля:</p>
+            <code>
+                <pre class="solution">
+&lt;head&gt;&lt;title&gt;hello&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;&lt;h1 class="main-text"&gt;Test&lt;/h1&gt;&lt;div class="container container-fluid" id="lead"&gt;&lt;p&gt;another test&lt;/p&gt;&lt;img is_single="True" src="/icon.png" data_image="responsive"&gt;&lt;/img&gt;&lt;/div&gt;&lt;/body&gt;                    
+                </pre>
+            </code>
+            <p>Теперь на очереди обработчик <code>is_single</code>:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name, <span>is_single=False,</span> **attributes):
+        self.name = name
+        self.text = ''
+        self.children = []
+        self.is_child = False
+        self.attributes = attributes
+        <span>self.is_single = is_single</span>
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self.is_child:
+            child_str = ''
+            for i in self.children:
+                child_str += str(i)
+            <span>if self.is_single:</span>
+                <span>print(f'<{self.name}{self.pretty_attr()}>')</span>
+            <span>else:</span>
+                <span>print(f'<{self.name}{self.pretty_attr()}>{child_str}&lt;/{self.name}>')</span>
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        other.is_child = True
+        return self
+
+    def __str__(self):
+        if self.children:
+            child_str = ''
+            for i in self.children:
+                child_str += str(i)
+            return f'<{self.name}{self.pretty_attr()}>{self.text}{child_str}&lt;/{self.name}>'
+        <span>else:</span>
+            <span>if self.is_single:</span>
+                <span>return f'<{self.name}{self.pretty_attr()}>'</span>
+            <span>else:</span>
+                <span>return f'<{self.name}{self.pretty_attr()}>{self.text}&lt;/{self.name}>'</span>
+
+    def pretty_attr(self):
+        if self.attributes:
+            attr_list = ' '
+            for attr, value in self.attributes.items():
+                if attr =='klass':
+                    attr = 'class'
+                    temp_value = ''
+                    for i in value:
+                        temp_value += i + ' '
+                    value = temp_value[0:-1]
+                attr_list += f'{attr}="{value}" '
+            return attr_list[0:-1]
+        else:
+            return ''
+                </pre>
+            </code>
+            <p>В <code>__exit__</code> я добавил проверку на случай, если одиночный тэг зохотят вывести без вложения.
+            По моей логике, такие тэги обычно вложены, но пусть будет. Плюс, в <code>__str__</code> 
+            проверяю одиночность только в ветке без детей, т.к. у одиночного тега не может быть детей. Поправьте, 
+            если я не прав.</p>
+            <p>Итак, получилось:</p>
+            <code>
+                <pre class="solution">
+&lt;head&gt;&lt;title&gt;hello&lt;/title&gt;&lt;/head&gt;
+&lt;body&gt;&lt;h1 class="main-text"&gt;Test&lt;/h1&gt;&lt;div class="container container-fluid" id="lead"&gt;&lt;p&gt;another test&lt;/p&gt;&lt;img src="/icon.png" data_image="responsive"&gt;&lt;/div&gt;&lt;/body&gt;                    
+                </pre>
+            </code>
+            <p>И на финише класс <code>HTML</code>, который отвечает за то, куда выводить все наше добро.</p>
+            <p>Я его унаследовал от <code>Tag</code> и переопределил методы <code>__enter__</code> и
+                <code>__exit__</code>. В сам <code>Tag</code> добавил параметр <code>output</code>, и сделал
+                <code>name</code> необязательным, задав значение по умолчанию, чтобы не переобпределять
+                <code>__init__</code> в <code>HTML</code>.
+            </p>
+            <p>Вот код целиком:</p>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, <span>name='tag',</span> is_single=False, <span>output='',</span> **attributes):
+        self.name = name
+        self.text = ''
+        self.children = []
+        self.is_child = False
+        self.attributes = attributes
+        self.is_single = is_single
+        <span>self.output = output</span>
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self.is_child:
+            child_str = ''
+            for i in self.children:
+                child_str += str(i)
+            if self.is_single:
+                print(f'<{self.name}{self.pretty_attr()}>')
+            else:
+                print(f'<{self.name}{self.pretty_attr()}>{child_str}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        other.is_child = True
+        return self
+
+    def __str__(self):
+        if self.children:
+            child_str = ''
+            for i in self.children:
+                child_str += str(i)
+            return f'<{self.name}{self.pretty_attr()}>{self.text}{child_str}&lt;/{self.name}>'
+        else:
+            if self.is_single:
+                return f'<{self.name}{self.pretty_attr()}>'
+            else:
+                return f'<{self.name}{self.pretty_attr()}>{self.text}&lt;/{self.name}>'
+
+    def pretty_attr(self):
+        if self.attributes:
+            attr_list = ' '
+            for attr, value in self.attributes.items():
+                if attr =='klass':
+                    attr = 'class'
+                    temp_value = ''
+                    for i in value:
+                        temp_value += i + ' '
+                    value = temp_value[0:-1]
+                attr_list += f'{attr}="{value}" '
+            return attr_list[0:-1]
+        else:
+            return ''
+
+
+class TopLevelTag(Tag):
+    pass
+
+<span>class HTML(Tag):</span>
+    <span>def __enter__(self):</span>
+            <span>return self</span>
+
+    <span>def __exit__(self, *args):</span>
+        <span>child_str = ''</span>
+        <span>for i in self.children:</span>
+            <span>child_str += str(i)</span>
+        <span>if self.output:</span>
+            <span>with open(self.output, 'w') as out_file:</span>
+                <span>print(f'&lt;html{self.pretty_attr()}>{child_str}&lt;/html>', file=out_file)</span>
+        <span>else:</span>
+            <span>print(f'&lt;html{self.pretty_attr()}>{child_str}&lt;/html>')</span>
+                </pre>
+            </code>
+            <p>Тест на коде из задания создает файл <code>test.html</code>:</p>
+            <code>
+                <pre class="solution">
+&lt;html&gt;
+    &lt;head&gt;
+        &lt;title&gt;hello&lt;/title&gt;
+    &lt;/head&gt;
+    &lt;body&gt;
+        &lt;h1 class="main-text"&gt;Test&lt;/h1&gt;
+        &lt;div class="container container-fluid" id="lead"&gt;
+            &lt;p&gt;another test&lt;/p&gt;
+            &lt;img src="/icon.png" data_image="responsive"&gt;
+        &lt;/div&gt;
+    &lt;/body&gt;
+&lt;/html&gt;
+                </pre>
+            </code>
+            <p>Выдает одной строкой. Это здесь для удобочитаемости и проверки я приукрасил его.</p>
+            <p>Спасибо за внимание! Готов выслушать критику, предложения. Пишите в Slack @LeontevAlex!</p>
+            <a href="3_13.py" download class="btn btn-outline-success" target="_blank" style="margin-bottom: 15px">Скачать код</a>
+            <h3>UPD</h3>
+            <p>Заметил, что циклы по спискам классов и детей можно заменить на <code>.join</code>.</p>
+            <em>Закомментированный код - было, выделенный - стало.</em>
+            <code>
+                <pre class="solution">
+class Tag:
+    def __init__(self, name='tag', is_single=False, output='', **attributes):
+        self.name = name
+        self.text=''
+        self.children = []
+        self.is_child = False
+        self.attributes = attributes
+        self.is_single = is_single
+        self.output = output
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        if not self.is_child:
+            # child_str = ''
+            # for i in self.children:
+            #     child_str += str(i)
+            <span>child_str = ''.join(map(str, self.children))</span>
+            if self.is_single:
+                print(f'<{self.name}{self.pretty_attr()}>')
+            else:
+                print(f'<{self.name}{self.pretty_attr()}>{child_str}&lt;/{self.name}>')
+
+    def __iadd__(self, other):
+        self.children.append(other)
+        other.is_child = True
+        return self
+
+    def __str__(self):
+        if self.children:
+            # child_str = ''
+            # for i in self.children:
+            #     child_str += str(i)
+            <span>child_str = ''.join(map(str, self.children))</span>
+            return f'<{self.name}{self.pretty_attr()}>{self.text}{child_str}&lt;/{self.name}>'
+        else:
+            if self.is_single:
+                return f'<{self.name}{self.pretty_attr()}>'
+            else:
+                return f'<{self.name}{self.pretty_attr()}>{self.text}&lt;/{self.name}>'
+
+    def pretty_attr(self):
+        if self.attributes:
+            attr_list = ' '
+            for attr, value in self.attributes.items():
+                if attr =='klass':
+                    attr = 'class'
+                    # temp_value = ''
+                    # for i in value:
+                    #     temp_value += i + ' '
+                    # value = temp_value[0:-1]
+                    <span>value = ' '.join(self.attributes['klass'])</span>
+                attr_list += f'{attr}="{value}" '
+            return attr_list[0:-1]
+        else:
+            return ''
+
+
+class TopLevelTag(Tag):
+    pass
+
+
+class HTML(Tag):
+    def __enter__(self):
+            return self
+
+    def __enter__(self):
+            return self
+
+    def __exit__(self, *args):
+        # child_str = ''
+        # for i in self.children:
+        #     child_str += str(i)
+        <span>child_str = ''.join(map(str, self.children))</span>
+        if self.output:
+            with open(self.output, 'w') as out_file:
+                print(f'&lt;html{self.pretty_attr()}&gt;{child_str}&lt;/html&gt;', file=out_file)
+        else:
+            print(f'&lt;html{self.pretty_attr()}&gt;{child_str}&lt;/html&gt;')
+                </pre>
+            </code>
+            <p>Минус 9 строк. Функуция <code>map</code> позволяет применять указанную в качестве первого аргумента
+            функцию ко всем элементам последовательности, переданной вторым аргументом.</p>
+            <p>Я все-таки считаю, что из <code>Tag</code> нужно убрать параметр <code>output</code>. Хоть он и не
+                мешает, он относится только к <code>HTML</code>. Сделаю это путем переопределения метода 
+                <code>__init__</code> в <code>HTML</code>. Плюс верну параметру <code>name</code> в <code>Tag</code> 
+                обязательность, т.е. уберу значение по умолчанию.</p>
+            <code>
+                <pre class="solution">
+class HTML(Tag):
+    <span>def __init__(self, output='', **attributes):</span>
+        <span>self.output = output</span>
+        <span>super().__init__(name='html', **attributes)</span>
+                </pre>
+            </code>
+            <p>Конструкция <code>super().__init__(name='html', **attributes)</code> в вольном переводе говорит: "все
+                остальное как у родительского класса, только с именем html и моими атрибутами". <code>**attributes</code>
+                тоже передаю, на случай, если кто-нибудь захочет указать, например, lang='en'.</p>
+        </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo"
+            crossorigin="anonymous">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"
+            integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1"
+            crossorigin="anonymous">
+    </script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"
+            integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM"
+            crossorigin="anonymous">
+    </script>
+    </body>
+</html>
